@@ -5,13 +5,13 @@ import sys
 tag = re.compile('&lt;(\w+).+?/\\1&gt;')
 ptn = re.compile('\'\'\'([^\']+)\'\'\' ?[(（]([^)）]+)[)）]')
 following_brace = re.compile('[(（][^)）]+[)）]$')
-
-valid_chars = ''.join(chr(i) for i in range(ord("ぁ"), ord("ゖ")+1))
+delimiter = re.compile('[、 ]')
 
 def main(filename):
     title=None
     try:
         with open(filename) as f:
+            print(';; -*- fundamental -*- ; coding: utf-8 -*-')
             for l in f:
                 l = l.strip()
                 l = tag.sub('', l)
@@ -29,20 +29,30 @@ def main(filename):
                 if not match:
                     continue
                 if remove_whitespaces(unescape_wiki(match.group(1))) != title: continue
-                yomis = match.group(2).split('、')
+                yomis = delimiter.split(match.group(2))
                 for yomi in yomis:
                     fyomi = format_yomi(yomi)
                     if fyomi is None: continue
-                    print(fyomi, ' /', title, get_descript_when_available(l), '/', sep='')
+                    if fyomi == '': continue
+                    print(fyomi, ' /', title, get_descript_when_available(l), '/', sep='', flush=False)
                 title = None
 
     except:
         pass
 
+valid_chars = ''.join(chr(i) for i in range(ord("ぁ"), ord("ゖ")+1))
+valid_chars += 'ー'
+valid_chars += '0123456789'
+valid_chars = set(valid_chars)
+
+erase_chars = '-・・･'
+
 def format_yomi(s):
     s = jaconv.kata2hira(s)
     s = remove_whitespaces(s)
     s = s.replace("'''", '')
+    for c in erase_chars:
+        s = s.replace(c, '')
     for c in s:
         if c not in valid_chars:
             return None
