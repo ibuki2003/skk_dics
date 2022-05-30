@@ -10,7 +10,7 @@ Wikipediaの記事のタイトルと読みをもとにSKK辞書を作成しま�
 
 ```sh
 # convert
-cat jawiki-latest-pages-articles.xml | python to_skk_dict.py > out_with_descripts.txt
+python from_wikipedia.py jawiki-latest-pages-articles.xml > out_with_descripts.txt
 
 # sort and format
 skkdic-expr2 out_with_descripts.txt | skkdic-sort > out_with_descripts_sorted.txt
