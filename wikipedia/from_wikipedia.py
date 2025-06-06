@@ -1,44 +1,72 @@
 import re
 import jaconv
 import sys
+import typing
+import xml.etree.ElementTree as ET
+from collections.abc import Iterator
 
-tag = re.compile('&lt;(\w+).+?/\\1&gt;')
-ptn = re.compile('\'\'\'([^\']+)\'\'\' ?[(（]([^)）]+)[)）]')
+ptn_normal = re.compile(r"『?'''([^']+)'''』? ?[(（]([^)）]+)[)）]")
+ptn_tagged = re.compile(r"\{\{読み[^|]*\|'''([^']+)'''([^}]+)\}\}")
 following_brace = re.compile('[(（][^)）]+[)）]$')
-delimiter = re.compile('[、 ]')
+delimiter = re.compile('[、,]')
+
+# argument file should be readable object.
+def extract_pages(file: typing.TextIO) -> Iterator[typing.Tuple[str, str]]:
+    lines = []
+    for line in file:
+        if len(lines) == 0 and not line.startswith('  <page>'):
+            continue
+        lines.append(line.strip())
+        if line.startswith('  </page>'):
+            text = '\n'.join(lines)
+            try:
+                parsed = ET.fromstring(text)
+                title = parsed.find('title')
+                text_element = parsed.find('revision/text')
+                if title is not None and text_element is not None:
+                    yield (title.text or '', text_element.text or '')
+            except ET.ParseError:
+                pass
+            lines = []
 
 def main(filename):
-    title=None
-    try:
-        with open(filename) as f:
-            print(';; -*- fundamental -*- ; coding: utf-8 -*-')
-            for l in f:
-                l = l.strip()
-                l = tag.sub('', l)
-                if l.startswith('<title>'):
-                    new_title = l[7:-8]
-                    new_title = following_brace.sub('', new_title)
-                    # if title is not None:
-                        # print("yomi not found for:", title)
-                    title = remove_whitespaces(new_title)
-                    # print("title:",title)
-                    continue
-                if title is None:
-                    continue
-                match = ptn.search(l)
-                if not match:
-                    continue
-                if remove_whitespaces(unescape_wiki(match.group(1))) != title: continue
+    print(';; -*- fundamental -*- ; coding: utf-8 -*-')
+    for title, text in extract_pages(open(filename, 'r', encoding='utf-8')):
+        title = remove_whitespaces(title)
+        if not title or not text:
+            continue
+
+        for line in text.split('\n'):
+            #     break
+            if line.startswith('== ') or line.startswith('=== ') or line.startswith('==== '):
+                break
+
+            match = ptn_normal.search(line)
+            if match and remove_whitespaces(match.group(1)) == title:
                 yomis = delimiter.split(match.group(2))
+                abstract = line[match.start():]
+                descript = get_descript_when_available(abstract)
                 for yomi in yomis:
+                    if yomi == '': continue
+                    yomi = format_yomi(yomi)
+                    if yomi is None: continue
+                    if yomi == '': continue
+                    print(yomi, ' /', title, descript, '/', sep='', flush=False)
+                continue
+
+            match = ptn_tagged.search(line)
+            if match and remove_whitespaces(match.group(1)) == title:
+                yomis = match.group(2).split('|')
+                abstract = line[match.start():]
+                descript = get_descript_when_available(abstract)
+                for yomi in yomis:
+                    if yomi == '': continue
                     fyomi = format_yomi(yomi)
                     if fyomi is None: continue
                     if fyomi == '': continue
-                    print(fyomi, ' /', title, get_descript_when_available(l), '/', sep='', flush=False)
-                title = None
+                    print(fyomi, ' /', title, descript, '/', sep='', flush=False)
+                continue
 
-    except:
-        pass
 
 valid_chars = ''.join(chr(i) for i in range(ord("ぁ"), ord("ゖ")+1))
 valid_chars += 'ー'
@@ -49,6 +77,7 @@ erase_chars = '-・・･'
 
 def format_yomi(s):
     s = jaconv.kata2hira(s)
+    s = unescape_wiki(s)
     s = remove_whitespaces(s)
     s = s.replace("'''", '')
     for c in erase_chars:
@@ -63,25 +92,31 @@ def remove_whitespaces(s):
     s = s.replace('　', '')
     return s
 
-wiki_link = re.compile('\[\[(?:[^\|]+\|)?([^\]]+)\]\]')
-other_lang = re.compile('{{lang[^}]+\|(.+)}}')
+wiki_link = re.compile(r'\[\[(?:[^\|\]]+?\|)?([^\]]+?)\]\]')
+wiki_tag = re.compile(r'\{\{[^}]+\}\}')
+other_lang = re.compile(r'{{lang[^}]+\|(.+)}}')
+comment = re.compile(r'<!--.*?-->', re.DOTALL)
+tag_ref = re.compile(r'<ref[^>]*>(.*?)</ref>|<ref [^>]*/>', re.DOTALL)
 
 def get_descript_when_available(s):
-    if '/' in s:
-        return ''
-    return ';' + unescape_wiki(s)
+    s = unescape_wiki(s)
+    s = s.replace('\n', ' ')
+    s = s.replace('/', '')
+    return ';' + s
 
 def unescape_wiki(s):
-    s = s.replace('<text xml:space="preserve">', '')
-    s = s.replace("'''", '')
-    s = s.replace('&gt;', '>')
-    s = s.replace('&lt;', '<')
-    s = s.replace('&amp;', '&')
-
+    # s = s.replace('<text xml:space="preserve">', '')
+    s = tag_ref.sub('', s)
     s = wiki_link.sub('\\1', s)
+    s = ptn_tagged.sub('\\1', s)
     s = other_lang.sub('\\1', s)
+    s = wiki_tag.sub('', s)
+    s = comment.sub('', s)
 
-    s = tag.sub('', s)
+    s = s.replace("'''", '')
+    ban_chars = ['{', '}', '[', ']']
+    for c in ban_chars:
+        s = s.replace(c, '')
     return s
 
 
