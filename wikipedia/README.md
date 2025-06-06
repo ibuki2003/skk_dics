@@ -16,3 +16,10 @@ python from_wikipedia.py jawiki-latest-pages-articles.xml > out_with_descripts.t
 skkdic-expr2 out_with_descripts.txt | skkdic-sort > out_with_descripts_sorted.txt
 ```
 
+## Downloads
+
+Wikipediaのライセンスに基づき、CC BY-SAのもとで頒布されます
+
+最終更新: 2025-06-01
+エントリ数: 747289
+https://fuwa.dev/Downloads/wikipedia_with_descripts_sorted.utf8.txt
