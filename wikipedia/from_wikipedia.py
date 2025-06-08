@@ -68,11 +68,9 @@ def main(filename):
                 continue
 
 
-valid_chars = ''.join(chr(i) for i in range(ord("ぁ"), ord("ゖ")+1))
-valid_chars += 'ー'
-valid_chars += '0123456789'
-valid_chars = set(valid_chars)
 
+CHARS_KANA = set(''.join(chr(i) for i in range(ord("ぁ"), ord("ゖ")+1)) + 'ー')
+valid_chars = CHARS_KANA.union('0123456789')
 erase_chars = '-・・･'
 
 def format_yomi(s):
@@ -82,9 +80,21 @@ def format_yomi(s):
     s = s.replace("'''", '')
     for c in erase_chars:
         s = s.replace(c, '')
+    has_kana = False
+
+    if len(s) <= 1:
+        # remove yomi with length 1
+        return None
+
     for c in s:
         if c not in valid_chars:
             return None
+        if c in CHARS_KANA:
+            has_kana = True
+
+    if not has_kana:
+        # remove yomi without kana
+        return None
     return s
 
 def remove_whitespaces(s):
